@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>Simple Page Maker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #FFFFFC;
+            --bg-secondary: #F8F7F6;
+            --bg-tertiary: #EBEBC9;
+            --text-main: #444444;
+            --accent-color: #647F98; /* Slate Blue */
+            --accent-hover: #93A7B9;
+            --accent-success: #79915C; /* Pea Green */
+            --accent-success-hover: #9DB286;
+            --accent-danger: #C0A7A4; /* Rusty Rose */
+            --accent-danger-hover: #D8C3C1;
+            --border-color: #E2E1DF;
+            --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+            --font-serif: Georgia, "Times New Roman", serif;
+        }
+
+        body {
+            font-family: var(--font-ui);
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--bg-secondary);
+            color: var(--text-main);
+        }
+
+        .controls {
+            width: 480px;
+            padding: 24px;
+            overflow-y: auto;
+            background-color: var(--bg-primary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .panel-header {
+            margin-bottom: 8px;
+        }
+
+        h2 {
+            font-family: var(--font-serif);
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: normal;
+        }
+
+        h3, h4 {
+            font-family: var(--font-serif);
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+            font-weight: normal;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        h3 {
+            font-size: 1.4rem;
+        }
+
+        h4 {
+            font-size: 1.2rem;
+            margin-top: 1rem;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .preview {
+            flex-grow: 1;
+            background-color: var(--bg-secondary);
+            position: relative;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 0.35rem;
+            color: var(--text-main);
+            opacity: 0.9;
+        }
+
+        input[type="text"], input[type="url"], select, textarea {
+            width: 100%;
+            height: 44px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+            background-color: var(--bg-secondary);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+
+        input[type="text"]:focus, input[type="url"]:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(100, 127, 152, 0.2);
+        }
+
+        /* Blocks styling */
+        .block-editor-card {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            background-color: var(--bg-secondary);
+            overflow: hidden;
+            transition: opacity 0.2s, border-color 0.2s;
+        }
+
+        .block-editor-card.dragging {
+            opacity: 0.4;
+            border-style: dashed;
+            background-color: var(--bg-tertiary);
+        }
+
+        .block-editor-header {
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            background-color: var(--bg-secondary);
+            transition: background-color 0.2s;
+        }
+
+        .block-editor-header:hover {
+            background-color: var(--border-color);
+        }
+
+        .block-editor-title {
+            flex-grow: 1;
+            font-weight: 500;
+            font-size: 0.95rem;
+            margin-left: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .block-editor-content {
+            padding: 16px;
+            display: none;
+            background-color: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .block-editor-content.expanded {
+            display: block;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            padding: 0 8px;
+            color: var(--text-main);
+            opacity: 0.4;
+            font-size: 1.25rem;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 44px;
+            box-sizing: border-box;
+        }
+
+        .drag-handle:hover {
+            opacity: 0.8;
+        }
+
+        .remove-block-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-danger);
+            font-size: 1.2rem;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .remove-block-btn:hover {
+            background-color: var(--border-color);
+        }
+
+        /* Sub list item grids */
+        .sub-list-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 0.75rem;
+            align-items: flex-end;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-secondary);
+        }
+
+        .sub-list-item div {
+            flex-grow: 1;
+        }
+
+        .add-btn, .sub-add-btn {
+            background: var(--accent-color);
+            color: var(--bg-primary);
+            border: none;
+            height: 44px;
+            padding: 0 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        .add-btn:hover, .sub-add-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .sub-add-btn {
+            height: 36px;
+            margin-top: 0.5rem;
+        }
+
+        .remove-sub-btn {
+            background: var(--accent-danger);
+            color: #444444;
+            border: none;
+            border-radius: 6px;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+
+        .remove-sub-btn:hover {
+            background: var(--accent-danger-hover);
+        }
+
+        /* Blocks Grid */
+        .blocks-add-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 1rem;
+        }
+
+        .block-add-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .block-add-btn:hover {
+            background-color: var(--border-color);
+            border-color: var(--accent-color);
+        }
+
+        .block-add-btn svg {
+            width: 20px;
+            height: 20px;
+            opacity: 0.8;
+        }
+
+        .generate-container {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        #generate-button {
+            background-color: var(--accent-success);
+            color: var(--bg-primary);
+            height: 48px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+
+        #generate-button:hover {
+            background-color: var(--accent-success-hover);
+        }
+
+        #generate-button:disabled {
+            background-color: var(--border-color);
+            color: var(--text-main);
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #download-container {
+            margin-top: 1.25rem;
+        }
+
+        #download-container h4 {
+            margin-top: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+            font-family: var(--font-serif);
+        }
+
+        #download-container a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 44px;
+            background-color: var(--accent-color);
+            color: var(--bg-primary);
+            text-decoration: none;
+            border-radius: 6px;
+            padding: 0 20px;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            transition: background-color 0.2s;
+        }
+
+        #download-container a:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .info {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            opacity: 0.75;
+            line-height: 1.4;
+            margin-top: 0.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        /* Truly Simple Tools Ecosystem Footer */
+        .tst-footer {
+            margin-top: 3rem;
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+
+        .tst-footer hr {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-version {
+            font-size: 0.75rem;
+            opacity: 0.6;
+            margin-bottom: 0.25rem;
+        }
+
+        .footer-tagline {
+            font-weight: 600;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-maker {
+            opacity: 0.75;
+            margin-bottom: 1rem;
+            line-height: 1.4;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-hover);
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls" id="controls-panel">
+        <header class="panel-header">
+            <h2>Simple Page Maker</h2>
+        </header>
+        <p class="info">Build a responsive single-page site by stacking, reordering, and customizing blocks. Download your static files when ready.</p>
+
+        <div>
+            <h3>Styles</h3>
+            <div class="form-group">
+                <label for="site-title">Page Title</label>
+                <input type="text" id="site-title" value="My Website">
+            </div>
+            <div class="form-group">
+                <label for="color-scheme">Color Theme</label>
+                <select id="color-scheme">
+                    <option value="paper">Cream Paper (Default)</option>
+                    <option value="charcoal">Charcoal</option>
+                    <option value="sepia">Sepia</option>
+                    <option value="slate">Slate</option>
+                    <option value="monochrome">Monochrome</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="font-scheme">Font Style</label>
+                <select id="font-scheme">
+                    <option value="system">System (Default)</option>
+                    <option value="serif">Serif</option>
+                    <option value="mono">Mono</option>
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <h3>Blocks</h3>
+            <div id="blocks-container"></div>
+            
+            <h4>Add Block</h4>
+            <div class="blocks-add-grid">
+                <button class="block-add-btn" data-type="bio">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Profile
+                </button>
+                <button class="block-add-btn" data-type="text">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+                    Text
+                </button>
+                <button class="block-add-btn" data-type="buttons">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="4"/><path d="M12 12h.01"/></svg>
+                    Buttons
+                </button>
+                <button class="block-add-btn" data-type="image">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    Image
+                </button>
+                <button class="block-add-btn" data-type="video">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+                    Video
+                </button>
+                <button class="block-add-btn" data-type="audio">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    Audio
+                </button>
+                <button class="block-add-btn" data-type="form">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                    Form
+                </button>
+                <button class="block-add-btn" data-type="divider">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M3 12h.01M21 12h.01"/></svg>
+                    Divider
+                </button>
+            </div>
+        </div>
+
+        <div class="generate-container">
+            <button id="generate-button">Generate Website</button>
+            <div id="download-container"></div>
+        </div>
+
+        <!-- Ecosystem Footer -->
+        <footer class="tst-footer">
+            <hr>
+            <div class="footer-version">Version 1.0.0 (Build 1)</div>
+            <div class="footer-tagline">Truly Simple Tools: Good basic apps.</div>
+            <div class="footer-maker">Simple Page Maker is designed and built by one person (my name is Colin), and I'd love to hear from you.</div>
+            <div class="footer-links">
+                <a href="https://trulysimpletools.com/" target="_blank" rel="noopener noreferrer">TST Apps</a>
+                <a href="https://trulysimpletools.com/about" target="_blank" rel="noopener noreferrer">About TST</a>
+                <a href="https://trulysimpletools.com/contact" target="_blank" rel="noopener noreferrer">Contact Colin</a>
+            </div>
+        </footer>
+    </div>
+
+    <div class="preview"><iframe id="preview-frame"></iframe></div>
+
+    <script>
+        const templateStyleCss = `
+:root {
+    --background-color: #FFFFFC;
+    --text-color: #444444;
+    --secondary-text-color: #647F98;
+    --accent-color: #79915C;
+    --border-color: #E2E1DF;
+    --body-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --content-width: 600px;
+    --base-font-size: 17px;
+    --base-line-height: 1.6;
+}
+html[data-theme='paper'] {
+    --background-color: #FFFFFC;
+    --text-color: #444444;
+    --secondary-text-color: #647F98;
+    --accent-color: #79915C;
+    --border-color: #E2E1DF;
+}
+html[data-theme='charcoal'] {
+    --background-color: #232322;
+    --text-color: #F8F7F6;
+    --secondary-text-color: #B6C9DB;
+    --accent-color: #DCC48E;
+    --border-color: #3A3A37;
+}
+html[data-theme='sepia'] {
+    --background-color: #F4F0E8;
+    --text-color: #4A4033;
+    --secondary-text-color: #7A6A58;
+    --accent-color: #B35900;
+    --border-color: #DCD3C3;
+}
+html[data-theme='slate'] {
+    --background-color: #2E3440;
+    --text-color: #ECEFF4;
+    --secondary-text-color: #D8DEE9;
+    --accent-color: #88C0D0;
+    --border-color: #4C566A;
+}
+html[data-theme='monochrome'] {
+    --background-color: #FFFFFC;
+    --text-color: #222222;
+    --secondary-text-color: #555555;
+    --accent-color: #444444;
+    --border-color: #DDDDDD;
+}
+html[data-font='serif'] { --body-font: Georgia, Merriweather, "Source Serif Pro", serif; }
+html[data-font='mono'] { --body-font: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, "Liberation Mono", monospace; }
+
+body { 
+    font-family: var(--body-font); 
+    background-color: var(--background-color); 
+    color: var(--text-color); 
+    margin: 0; 
+    padding: 3rem 1rem; 
+    font-size: var(--base-font-size); 
+    line-height: var(--base-line-height); 
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s; 
+    position: relative;
+}
+
+/* Theme Toggle Button absolute placement */
+.theme-toggle {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+    transition: background-color 0.2s, color 0.2s;
+    padding: 0;
+    margin: 0;
+    z-index: 100;
+}
+.theme-toggle:hover {
+    background-color: var(--border-color);
+}
+.theme-toggle svg {
+    width: 24px;
+    height: 24px;
+}
+
+#blocks-container { max-width: var(--content-width); margin: 0 auto; }
+
+/* Blocks Styles */
+.block {
+    margin-bottom: 3rem;
+}
+.block:last-child {
+    margin-bottom: 0;
+}
+
+/* Bio Block */
+.bio-block {
+    text-align: center;
+}
+.bio-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--border-color);
+    margin-bottom: 1.25rem;
+}
+.bio-name {
+    font-size: 2.2rem;
+    margin: 0 0 0.5rem 0;
+    font-weight: normal;
+    line-height: 1.2;
+}
+.bio-text {
+    font-size: 1.15rem;
+    color: var(--text-color);
+    opacity: 0.85;
+    margin: 0 0 1.5rem 0;
+}
+.bio-socials {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.bio-socials a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--secondary-text-color);
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+.bio-socials a:hover {
+    background-color: var(--border-color);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+.bio-socials a svg, .bio-socials a img {
+    width: 20px;
+    height: 20px;
+}
+.bio-socials a img {
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Text Block */
+.text-block h2 {
+    font-size: 1.75rem;
+    margin: 0 0 1rem 0;
+    font-weight: normal;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+.text-block p {
+    margin: 0 0 1rem 0;
+}
+.text-block p:last-child {
+    margin-bottom: 0;
+}
+
+/* Buttons Block */
+.buttons-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    background-color: transparent;
+    border: 2px solid var(--border-color);
+    color: var(--text-color);
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    padding: 8px 24px;
+    text-align: center;
+}
+.action-button:hover {
+    background-color: var(--border-color);
+}
+
+/* Image Block */
+.image-block {
+    margin: 0;
+    text-align: center;
+}
+.image-block img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+.image-caption {
+    font-size: 0.9rem;
+    color: var(--secondary-text-color);
+    margin-top: 0.5rem;
+}
+
+/* Media Blocks */
+.video-block, .audio-block {
+    width: 100%;
+}
+.video-block iframe, .audio-block iframe {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+}
+.responsive-video {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    height: 0;
+    overflow: hidden;
+    border-radius: 8px;
+}
+.responsive-video iframe, .responsive-video video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 8px;
+}
+
+/* Form Block */
+.form-block {
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    border-radius: 8px;
+}
+.form-block h3 {
+    margin-top: 0;
+    font-size: 1.4rem;
+    font-weight: normal;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+.form-group-field {
+    margin-bottom: 1rem;
+}
+.form-group-field label {
+    display: block;
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 0.35rem;
+}
+.form-group-field input, .form-group-field textarea {
+    width: 100%;
+    height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 16px;
+    background-color: transparent;
+    color: var(--text-color);
+    font-family: var(--body-font);
+}
+.form-group-field textarea {
+    height: 100px;
+    resize: vertical;
+}
+.form-submit-btn {
+    width: 100%;
+    height: 44px;
+    background-color: var(--accent-color);
+    color: var(--background-color);
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.form-submit-btn:hover {
+    opacity: 0.9;
+}
+
+/* Divider Block */
+.divider-line {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 0;
+}
+`;
+
+        const templateScriptJs = `
+const themeToggleButton = document.getElementById('theme-toggle-button');
+const darkThemes = ['charcoal', 'slate'];
+
+function getBaseTheme() {
+    return window.colorScheme || (typeof colorScheme !== 'undefined' ? colorScheme : 'paper');
+}
+
+function getDarkPartner(theme) {
+    if (theme === 'sepia') return 'slate';
+    return 'charcoal';
+}
+
+function getLightPartner(theme) {
+    if (theme === 'slate') return 'sepia';
+    if (theme === 'charcoal') return 'paper';
+    return theme;
+}
+
+function applyCustomizations() {
+    if (typeof colorScheme !== 'undefined' && colorScheme !== 'system') document.documentElement.setAttribute('data-theme', colorScheme);
+    if (typeof fontScheme !== 'undefined' && fontScheme !== 'system') document.documentElement.setAttribute('data-font', fontScheme);
+}
+
+function initTheme() {
+    const baseTheme = getBaseTheme();
+    const isBaseDark = darkThemes.includes(baseTheme);
+    const savedPref = localStorage.getItem('site-theme-preference');
+    
+    let activeTheme = baseTheme;
+    if (savedPref === 'dark' && !isBaseDark) {
+        activeTheme = getDarkPartner(baseTheme);
+    } else if (savedPref === 'light' && isBaseDark) {
+        activeTheme = getLightPartner(baseTheme);
+    }
+    
+    document.documentElement.setAttribute('data-theme', activeTheme);
+    renderThemeToggleIcon(activeTheme);
+}
+
+function renderThemeToggleIcon(currentTheme) {
+    if (!themeToggleButton) return;
+    const isDark = darkThemes.includes(currentTheme);
+    if (isDark) {
+        themeToggleButton.innerHTML = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>\`;
+        themeToggleButton.setAttribute('aria-label', 'Switch to light theme');
+    } else {
+        themeToggleButton.innerHTML = \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>\`;
+        themeToggleButton.setAttribute('aria-label', 'Switch to dark theme');
+    }
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || getBaseTheme();
+    const isCurrentDark = darkThemes.includes(currentTheme);
+    const baseTheme = getBaseTheme();
+    
+    let newTheme;
+    if (isCurrentDark) {
+        newTheme = darkThemes.includes(baseTheme) ? getLightPartner(baseTheme) : baseTheme;
+        localStorage.setItem('site-theme-preference', 'light');
+    } else {
+        newTheme = darkThemes.includes(baseTheme) ? baseTheme : getDarkPartner(baseTheme);
+        localStorage.setItem('site-theme-preference', 'dark');
+    }
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    renderThemeToggleIcon(newTheme);
+}
+
+function initVideos() {
+    const videoBlocks = document.querySelectorAll('.video-block');
+    videoBlocks.forEach(block => {
+        const videoType = block.getAttribute('data-video-type');
+        const videoUrl = block.getAttribute('data-video-url');
+        if (videoType !== 'embed' || !videoUrl) return;
+        
+        const getYoutubeId = (u) => {
+            let match = u.match(/(?:youtube\\.com\\/(?:[^\\/]+\\/.+\\/|(?:v|e(?:mbed)?|shorts)\\/|.*[?&]v=)|youtu\\.be\\/)([^"&?\\/ ]{11})/i);
+            if (match) return match[1];
+            let fallbackMatch = u.match(/(?:v=|youtu\\.be\\/|embed\\/|shorts\\/)([^"&?\\/ ]{11})/i);
+            return fallbackMatch ? fallbackMatch[1] : null;
+        };
+
+        const getEmbedUrl = (u) => {
+            if (u.startsWith('<iframe')) {
+                const m = u.match(/src="([^"]+)"/);
+                return m ? m[1] : '';
+            }
+            const ytId = getYoutubeId(u);
+            if (ytId) return \`https://www.youtube.com/embed/\${ytId}\`;
+            
+            let vimeoMatch = u.match(/(?:vimeo\\.com\\/|player\\.vimeo\\.com\\/video\\/)([0-9]+)/i);
+            if (vimeoMatch) return \`https://player.vimeo.com/video/\${vimeoMatch[1]}\`;
+            
+            let loomMatch = u.match(/(?:loom\\.com\\/share\\/|loom\\.com\\/embed\\/)([a-zA-Z0-9]+)/i);
+            if (loomMatch) return \`https://www.loom.com/embed/\${loomMatch[1]}\`;
+            return u;
+        };
+
+        const ytId = getYoutubeId(videoUrl);
+        let isLocal = window.location.protocol === 'file:';
+        try {
+            if (window.location.protocol === 'about:' && window.parent && window.parent.location.protocol === 'file:') {
+                isLocal = true;
+            }
+        } catch (e) {}
+        
+        if (isLocal && ytId) {
+            block.innerHTML = \`
+                <a href="https://www.youtube.com/watch?v=\${ytId}" target="_blank" rel="noopener noreferrer" class="local-video-placeholder" style="display: block; position: relative; border-radius: 8px; overflow: hidden; text-decoration: none; border: 1px solid var(--border-color); background: #000; outline: none; margin: 0 auto; max-width: 100%;">
+                    <img src="https://img.youtube.com/vi/\${ytId}/hqdefault.jpg" alt="Watch video on YouTube" style="width: 100%; display: block; filter: brightness(0.85); transition: filter 0.2s; aspect-ratio: 16/9; object-fit: cover;">
+                    <div class="play-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(0,0,0,0.15); transition: background-color 0.2s;">
+                        <div class="play-button-icon" style="width: 68px; height: 48px; background: rgba(229, 9, 20, 0.9); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; transition: background 0.2s;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; margin-left: 2px;"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                        <span class="play-text" style="color: white; font-family: var(--body-font), sans-serif; font-size: 0.85rem; font-weight: 500; text-shadow: 0 1px 3px rgba(0,0,0,0.8); background: rgba(0,0,0,0.65); padding: 6px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">Local Preview: Watch on YouTube</span>
+                    </div>
+                </a>
+                <style>
+                    .local-video-placeholder:hover img { filter: brightness(0.95) !important; }
+                    .local-video-placeholder:hover .play-button-icon { background: #FF0000 !important; }
+                </style>
+            \`;
+        } else {
+            const embedUrl = getEmbedUrl(videoUrl);
+            block.innerHTML = \`
+                <div class="responsive-video">
+                    <iframe src="\${embedUrl}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                </div>
+            \`;
+        }
+    });
+}
+
+function main() {
+    applyCustomizations();
+    initTheme();
+    initVideos();
+}
+
+window.initTheme = initTheme;
+window.toggleTheme = toggleTheme;
+window.initVideos = initVideos;
+
+if (themeToggleButton) {
+    themeToggleButton.addEventListener('click', toggleTheme);
+}
+
+main();`;
+
+        function getSocialIconSvg(platform) {
+            const icons = {
+                website: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></svg>`,
+                email: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
+                github: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/></svg>`,
+                instagram: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37zM17.5 6.5h.01"/></svg>`,
+                twitter: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>`,
+                youtube: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3v6Z"/></svg>`
+            };
+            return icons[platform] || icons.website;
+        }
+
+        // Blocks state management
+        let blocks = [
+            {
+                id: "block-default-bio",
+                type: "bio",
+                name: "Colin Wright",
+                avatar: "", // Default empty triggers blank silhouette placeholder
+                bio: "I build simple, useful software tools for makers. Welcome to my personal page.",
+                socials: [
+                    { platform: "github", url: "https://github.com/colinwright" },
+                    { platform: "instagram", url: "https://instagram.com" }
+                ]
+            },
+            {
+                id: "block-default-text",
+                type: "text",
+                title: "My Philosophy",
+                content: "Ruthless prioritization, clean aesthetics, and zero subscriptions. I design tools that help you build things cheaply and quickly."
+            },
+            {
+                id: "block-default-buttons",
+                type: "buttons",
+                items: [
+                    { text: "Truly Simple Tools", url: "https://trulysimpletools.com" },
+                    { text: "RSS Page Maker", url: "https://colinwright.github.io/rss-page-maker/" }
+                ]
+            },
+            {
+                id: "block-default-video",
+                type: "video",
+                videoType: "embed",
+                videoUrl: "https://www.youtube.com/watch?v=h33Srr5J9nY" // Embeddable Chrome developers video to prevent error 153
+            },
+            {
+                id: "block-default-form",
+                type: "form",
+                formType: "contact",
+                formAction: "",
+                successMessage: "Thank you! I will get back to you shortly."
+            }
+        ];
+
+        let expandedBlocks = new Set(["block-default-bio"]);
+        const controlsPanel = document.getElementById('controls-panel');
+        const blocksContainer = document.getElementById('blocks-container');
+        const previewFrame = document.getElementById('preview-frame');
+        let debounceTimer;
+
+        const escapeHTML = str => {
+            const p = document.createElement("p");
+            p.textContent = str || '';
+            return p.innerHTML;
+        }
+
+        function getEmbedUrl(url, type) {
+            if (!url) return '';
+            url = url.trim();
+            if (url.startsWith('<iframe')) {
+                const match = url.match(/src="([^"]+)"/);
+                return match ? match[1] : '';
+            }
+            
+            if (type === 'video') {
+                let ytId = null;
+                let match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/ ]{11})/i);
+                if (match) {
+                    ytId = match[1];
+                } else {
+                    let fallbackMatch = url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([^"&?\/ ]{11})/i);
+                    if (fallbackMatch) ytId = fallbackMatch[1];
+                }
+                if (ytId) return `https://www.youtube.com/embed/${ytId}`;
+                
+                let vimeoMatch = url.match(/(?:vimeo\.com\/|player\.vimeo\.com\/video\/)([0-9]+)/i);
+                if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+                
+                let loomMatch = url.match(/(?:loom\.com\/share\/|loom\.com\/embed\/)([a-zA-Z0-9]+)/i);
+                if (loomMatch) return `https://www.loom.com/embed/${loomMatch[1]}`;
+            } else if (type === 'audio') {
+                let spotifyMatch = url.match(/spotify\.com\/(track|album|playlist|show|episode)\/([a-zA-Z0-9]+)/i);
+                if (spotifyMatch) return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}`;
+                
+                let soundcloudMatch = url.match(/soundcloud\.com\/[a-zA-Z0-9-]+\/[a-zA-Z0-9-]+/i);
+                if (soundcloudMatch) return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}`;
+            }
+            return url;
+        }
+
+        // Render card editors in the sidebar
+        function renderBlockEditors() {
+            blocksContainer.innerHTML = '';
+            
+            blocks.forEach(block => {
+                const card = document.createElement('div');
+                card.className = 'block-editor-card';
+                card.setAttribute('draggable', 'false');
+                card.setAttribute('data-block-id', block.id);
+                
+                const isExpanded = expandedBlocks.has(block.id);
+                
+                const cardHeader = document.createElement('div');
+                cardHeader.className = `block-editor-header ${isExpanded ? 'expanded' : ''}`;
+                cardHeader.setAttribute('data-block-id', block.id);
+                cardHeader.innerHTML = `
+                    <div class="drag-handle" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</div>
+                    <div class="block-editor-title">
+                        ${block.type.charAt(0).toUpperCase() + block.type.slice(1)}
+                    </div>
+                    <button class="remove-block-btn" data-block-id="${block.id}" title="Delete Block" aria-label="Delete Block">×</button>
+                `;
+                
+                const cardContent = document.createElement('div');
+                cardContent.className = `block-editor-content ${isExpanded ? 'expanded' : ''}`;
+                cardContent.innerHTML = getBlockEditorHtml(block);
+                
+                card.appendChild(cardHeader);
+                card.appendChild(cardContent);
+                blocksContainer.appendChild(card);
+            });
+        }
+
+        // Get form HTML depending on the block type
+        function getBlockEditorHtml(block) {
+            if (block.type === 'bio') {
+                const socialsHtml = (block.socials || []).map((social, index) => `
+                    <div class="sub-list-item" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <div style="flex: 1;">
+                                <label>Platform</label>
+                                <select data-block-id="${block.id}" data-list-field="socials" data-index="${index}" data-field="platform">
+                                    <option value="website" ${social.platform === 'website' ? 'selected' : ''}>Website</option>
+                                    <option value="email" ${social.platform === 'email' ? 'selected' : ''}>Email</option>
+                                    <option value="github" ${social.platform === 'github' ? 'selected' : ''}>GitHub</option>
+                                    <option value="instagram" ${social.platform === 'instagram' ? 'selected' : ''}>Instagram</option>
+                                    <option value="twitter" ${social.platform === 'twitter' ? 'selected' : ''}>Twitter</option>
+                                    <option value="youtube" ${social.platform === 'youtube' ? 'selected' : ''}>YouTube</option>
+                                </select>
+                            </div>
+                            <div style="flex: 2;">
+                                <label>Link URL</label>
+                                <input type="text" data-block-id="${block.id}" data-list-field="socials" data-index="${index}" data-field="url" value="${escapeHTML(social.url)}" placeholder="e.g., https://example.com">
+                            </div>
+                            <button class="remove-sub-btn" data-block-id="${block.id}" data-sub-type="socials" data-index="${index}" title="Remove social link" style="margin-bottom: 0;">×</button>
+                        </div>
+                        <div>
+                            <label>Custom Icon URL (optional)</label>
+                            <input type="text" data-block-id="${block.id}" data-list-field="socials" data-index="${index}" data-field="iconUrl" value="${escapeHTML(social.iconUrl || '')}" placeholder="e.g., https://example.com/icon.png">
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" data-block-id="${block.id}" data-field="name" value="${escapeHTML(block.name)}">
+                    </div>
+                    <div class="form-group">
+                        <label>Avatar Image URL</label>
+                        <input type="text" data-block-id="${block.id}" data-field="avatar" value="${escapeHTML(block.avatar)}" placeholder="e.g., https://example.com/avatar.jpg">
+                    </div>
+                    <div class="form-group">
+                        <label>Bio</label>
+                        <textarea data-block-id="${block.id}" data-field="bio">${escapeHTML(block.bio)}</textarea>
+                    </div>
+                    <div>
+                        <label>Social Links</label>
+                        <div class="sub-list-container">${socialsHtml}</div>
+                        <button class="sub-add-btn" data-block-id="${block.id}" data-sub-type="socials">+ Add Social Link</button>
+                    </div>
+                `;
+            } else if (block.type === 'text') {
+                return `
+                    <div class="form-group">
+                        <label>Heading</label>
+                        <input type="text" data-block-id="${block.id}" data-field="title" value="${escapeHTML(block.title)}" placeholder="e.g., About Me">
+                    </div>
+                    <div class="form-group">
+                        <label>Text</label>
+                        <textarea data-block-id="${block.id}" data-field="content">${escapeHTML(block.content)}</textarea>
+                    </div>
+                `;
+            } else if (block.type === 'buttons') {
+                const itemsHtml = (block.items || []).map((item, index) => `
+                    <div class="sub-list-item">
+                        <div>
+                            <label>Button Text</label>
+                            <input type="text" data-block-id="${block.id}" data-list-field="items" data-index="${index}" data-field="text" value="${escapeHTML(item.text)}">
+                        </div>
+                        <div>
+                            <label>Link URL</label>
+                            <input type="text" data-block-id="${block.id}" data-list-field="items" data-index="${index}" data-field="url" value="${escapeHTML(item.url)}">
+                        </div>
+                        <button class="remove-sub-btn" data-block-id="${block.id}" data-sub-type="buttons" data-index="${index}" title="Remove button">×</button>
+                    </div>
+                `).join('');
+
+                return `
+                    <div>
+                        <label>Buttons</label>
+                        <div class="sub-list-container">${itemsHtml}</div>
+                        <button class="sub-add-btn" data-block-id="${block.id}" data-sub-type="buttons">+ Add Button</button>
+                    </div>
+                `;
+            } else if (block.type === 'image') {
+                return `
+                    <div class="form-group">
+                        <label>Image URL</label>
+                        <input type="text" data-block-id="${block.id}" data-field="imageUrl" value="${escapeHTML(block.imageUrl || '')}" placeholder="https://example.com/image.jpg">
+                    </div>
+                    <div class="form-group">
+                        <label>Alt Text</label>
+                        <input type="text" data-block-id="${block.id}" data-field="altText" value="${escapeHTML(block.altText || '')}" placeholder="Image description (for screen readers)">
+                    </div>
+                    <div class="form-group">
+                        <label>Caption (optional)</label>
+                        <input type="text" data-block-id="${block.id}" data-field="caption" value="${escapeHTML(block.caption || '')}" placeholder="Photo caption details">
+                    </div>
+                `;
+            } else if (block.type === 'video') {
+                return `
+                    <div class="form-group">
+                        <label>Video Source</label>
+                        <select data-block-id="${block.id}" data-field="videoType">
+                            <option value="embed" ${block.videoType === 'embed' ? 'selected' : ''}>YouTube or Vimeo</option>
+                            <option value="direct" ${block.videoType === 'direct' ? 'selected' : ''}>Direct MP4 URL</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Video URL</label>
+                        <input type="text" data-block-id="${block.id}" data-field="videoUrl" value="${escapeHTML(block.videoUrl || '')}" placeholder="e.g., https://www.youtube.com/watch?v=...">
+                    </div>
+                `;
+            } else if (block.type === 'audio') {
+                return `
+                    <div class="form-group">
+                        <label>Audio Source</label>
+                        <select data-block-id="${block.id}" data-field="audioType">
+                            <option value="embed" ${block.audioType === 'embed' ? 'selected' : ''}>Spotify or SoundCloud</option>
+                            <option value="direct" ${block.audioType === 'direct' ? 'selected' : ''}>Direct MP3 URL</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Audio URL</label>
+                        <input type="text" data-block-id="${block.id}" data-field="audioUrl" value="${escapeHTML(block.audioUrl || '')}" placeholder="e.g., https://open.spotify.com/track/...">
+                    </div>
+                `;
+            } else if (block.type === 'form') {
+                return `
+                    <div class="form-group">
+                        <label>Form Type</label>
+                        <select data-block-id="${block.id}" data-field="formType">
+                            <option value="contact" ${block.formType === 'contact' ? 'selected' : ''}>Contact (Name, Email, Message)</option>
+                            <option value="newsletter" ${block.formType === 'newsletter' ? 'selected' : ''}>Newsletter (Email only)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Form Action URL</label>
+                        <input type="text" data-block-id="${block.id}" data-field="formAction" value="${escapeHTML(block.formAction || '')}" placeholder="e.g., https://formspree.io/f/your-id (or blank for Netlify)">
+                    </div>
+                    <div class="form-group">
+                        <label>Success Message</label>
+                        <input type="text" data-block-id="${block.id}" data-field="successMessage" value="${escapeHTML(block.successMessage || '')}" placeholder="e.g., Thank you! Your message has been sent.">
+                    </div>
+                `;
+            } else if (block.type === 'divider') {
+                return `
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select data-block-id="${block.id}" data-field="dividerType">
+                            <option value="line" ${block.dividerType === 'line' ? 'selected' : ''}>Horizontal Line</option>
+                            <option value="spacer" ${block.dividerType === 'spacer' ? 'selected' : ''}>Blank Space</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Height</label>
+                        <select data-block-id="${block.id}" data-field="spacing">
+                            <option value="1" ${block.spacing === '1' ? 'selected' : ''}>Small (1rem)</option>
+                            <option value="2" ${block.spacing === '2' || !block.spacing ? 'selected' : ''}>Medium (2rem)</option>
+                            <option value="3" ${block.spacing === '3' ? 'selected' : ''}>Large (3rem)</option>
+                            <option value="4" ${block.spacing === '4' ? 'selected' : ''}>Extra Large (4rem)</option>
+                        </select>
+                    </div>
+                `;
+            }
+            return '';
+        }
+
+        // Render HTML representation of a block inside preview frame
+        function generateBlockPreviewHTML(block) {
+            if (block.type === 'bio') {
+                const socialsHtml = (block.socials || []).map(s => {
+                    if (!s.url) return '';
+                    let label = s.platform.charAt(0).toUpperCase() + s.platform.slice(1);
+                    let href = s.url;
+                    if (s.platform === 'email' && !href.startsWith('mailto:')) {
+                        href = 'mailto:' + href;
+                    }
+                    const iconContent = s.iconUrl ? `<img src="${escapeHTML(s.iconUrl)}" alt="${escapeHTML(label)}">` : getSocialIconSvg(s.platform);
+                    return `<a href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHTML(label)}" title="${escapeHTML(label)}">${iconContent}</a>`;
+                }).join('');
+
+                const avatarSrc = block.avatar || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23AAAAAA'><rect width='100' height='100' fill='%23E8E7E5'/><circle cx='50' cy='40' r='18'/><path d='M50 63c-22 0-35 12-35 25v4h70v-4c0-13-13-25-35-25z'/></svg>";
+                return `
+                    <div class="block bio-block">
+                        <img class="bio-avatar" src="${escapeHTML(avatarSrc)}" alt="${escapeHTML(block.name)}">
+                        <h1 class="bio-name">${escapeHTML(block.name)}</h1>
+                        ${block.bio ? `<p class="bio-text">${escapeHTML(block.bio)}</p>` : ''}
+                        ${socialsHtml ? `<div class="bio-socials">${socialsHtml}</div>` : ''}
+                    </div>
+                `;
+            } else if (block.type === 'text') {
+                const paragraphs = (block.content || '').split('\n').filter(p => p.trim()).map(p => `<p>${escapeHTML(p)}</p>`).join('');
+                return `
+                    <div class="block text-block">
+                        ${block.title ? `<h2>${escapeHTML(block.title)}</h2>` : ''}
+                        ${paragraphs}
+                    </div>
+                `;
+            } else if (block.type === 'buttons') {
+                const buttonsHtml = (block.items || []).map(item => `
+                    <a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer" class="action-button">${escapeHTML(item.text)}</a>
+                `).join('');
+                return `
+                    <div class="block buttons-block">
+                        ${buttonsHtml}
+                    </div>
+                `;
+            } else if (block.type === 'image') {
+                if (!block.imageUrl) return '';
+                return `
+                    <figure class="block image-block">
+                        <img src="${escapeHTML(block.imageUrl)}" alt="${escapeHTML(block.altText || '')}">
+                        ${block.caption ? `<figcaption class="image-caption">${escapeHTML(block.caption)}</figcaption>` : ''}
+                    </figure>
+                `;
+            } else if (block.type === 'video') {
+                if (!block.videoUrl) return '';
+                if (block.videoType === 'direct') {
+                    return `
+                        <div class="block video-block" data-video-type="direct" data-video-url="${escapeHTML(block.videoUrl)}">
+                            <video src="${escapeHTML(block.videoUrl)}" controls style="width:100%; border-radius: 8px;"></video>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="block video-block" data-video-type="embed" data-video-url="${escapeHTML(block.videoUrl)}">
+                        </div>
+                    `;
+                }
+            } else if (block.type === 'audio') {
+                if (!block.audioUrl) return '';
+                if (block.audioType === 'direct') {
+                    return `
+                        <div class="block audio-block">
+                            <audio src="${escapeHTML(block.audioUrl)}" controls style="width:100%;"></audio>
+                        </div>
+                    `;
+                } else {
+                    const embedUrl = getEmbedUrl(block.audioUrl, 'audio');
+                    if (!embedUrl) return '';
+                    const height = embedUrl.includes('spotify') ? '80' : '166';
+                    return `
+                        <div class="block audio-block">
+                            <iframe src="${escapeHTML(embedUrl)}" width="100%" height="${height}" scrolling="no" frameborder="no" allow="autoplay; encrypted-media"></iframe>
+                        </div>
+                    `;
+                }
+            } else if (block.type === 'form') {
+                const action = block.formAction ? `action="${escapeHTML(block.formAction)}"` : 'data-netlify="true" name="contact-form"';
+                const successRedirect = block.successMessage ? `<input type="hidden" name="_next" value="${escapeHTML(block.successMessage)}">` : '';
+                
+                if (block.formType === 'newsletter') {
+                    return `
+                        <div class="block form-block">
+                            <h3>Newsletter Signup</h3>
+                            <form ${action} method="POST">
+                                ${successRedirect}
+                                <div class="form-group-field">
+                                    <label>Email Address</label>
+                                    <input type="email" name="email" required placeholder="email@example.com">
+                                </div>
+                                <button type="submit" class="form-submit-btn">Subscribe</button>
+                            </form>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="block form-block">
+                            <h3>Contact Me</h3>
+                            <form ${action} method="POST">
+                                ${successRedirect}
+                                <div class="form-group-field">
+                                    <label>Your Name</label>
+                                    <input type="text" name="name" required placeholder="Your Name">
+                                </div>
+                                <div class="form-group-field">
+                                    <label>Email Address</label>
+                                    <input type="email" name="email" required placeholder="email@example.com">
+                                </div>
+                                <div class="form-group-field">
+                                    <label>Your Message</label>
+                                    <textarea name="message" required placeholder="Write your message here..."></textarea>
+                                </div>
+                                <button type="submit" class="form-submit-btn">Send Message</button>
+                            </form>
+                        </div>
+                    `;
+                }
+            } else if (block.type === 'divider') {
+                const spaceHeight = block.spacing === '1' ? '1rem' : block.spacing === '3' ? '3rem' : block.spacing === '4' ? '4rem' : '2rem';
+                if (block.dividerType === 'spacer') {
+                    return `<div class="block" style="height: ${spaceHeight};"></div>`;
+                } else {
+                    return `<div class="block" style="margin-top: calc(${spaceHeight} / 2); margin-bottom: calc(${spaceHeight} / 2);"><hr class="divider-line"></div>`;
+                }
+            }
+            return '';
+        }
+
+        // Update preview iframe window
+        const updatePreview = () => {
+            const previewDoc = previewFrame.contentDocument;
+            const previewWindow = previewFrame.contentWindow;
+            if (!previewDoc || !previewWindow) return;
+
+            // Update title, scheme attributes
+            previewDoc.title = document.getElementById('site-title').value;
+            const selectedTheme = document.getElementById('color-scheme').value;
+            previewWindow.colorScheme = selectedTheme;
+            previewWindow.fontScheme = document.getElementById('font-scheme').value;
+            
+            previewDoc.documentElement.setAttribute('data-theme', selectedTheme);
+            previewDoc.documentElement.setAttribute('data-font', document.getElementById('font-scheme').value);
+            
+            try {
+                previewWindow.localStorage.removeItem('site-theme-preference');
+            } catch(e) {}
+            
+            if (typeof previewWindow.initTheme === 'function') {
+                previewWindow.initTheme();
+            }
+
+            // Render all blocks HTML
+            const container = previewDoc.getElementById('blocks-container');
+            if (container) {
+                container.innerHTML = blocks.map(block => generateBlockPreviewHTML(block)).join('\n');
+            }
+            if (previewWindow && typeof previewWindow.initVideos === 'function') {
+                previewWindow.initVideos();
+            }
+        }
+
+        const debounceUpdatePreview = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(updatePreview, 300);
+        }
+
+        // Add sub-item platforms and button edits dynamically on keypress
+        const handleControlInput = e => {
+            const target = e.target;
+            const blockId = target.getAttribute('data-block-id');
+            const field = target.getAttribute('data-field');
+            const listField = target.getAttribute('data-list-field');
+            const index = parseInt(target.getAttribute('data-index'), 10);
+            
+            if (blockId) {
+                const block = blocks.find(b => b.id === blockId);
+                if (block) {
+                    if (listField && !isNaN(index) && field) {
+                        // Edit item inside a list
+                        if (block[listField] && block[listField][index]) {
+                            block[listField][index][field] = target.value;
+                        }
+                    } else if (field) {
+                        // Edit primary item fields
+                        block[field] = target.value;
+                    }
+                    debounceUpdatePreview();
+                }
+            } else if (target.id === 'site-title' || target.id === 'color-scheme' || target.id === 'font-scheme') {
+                debounceUpdatePreview();
+            }
+        }
+
+        // Toggle card collapse / delete blocks
+        function toggleBlockExpand(blockId) {
+            if (expandedBlocks.has(blockId)) {
+                expandedBlocks.delete(blockId);
+            } else {
+                expandedBlocks.add(blockId);
+            }
+            renderBlockEditors();
+        }
+
+        const setupDragAndDrop = (container) => {
+            let dragEl = null;
+
+            container.addEventListener('mousedown', e => {
+                const handle = e.target.closest('.drag-handle');
+                if (handle) {
+                    const item = handle.closest('.block-editor-card');
+                    if (item) {
+                        item.setAttribute('draggable', 'true');
+                    }
+                }
+            });
+
+            container.addEventListener('mouseup', e => {
+                const item = e.target.closest('.block-editor-card');
+                if (item) {
+                    item.setAttribute('draggable', 'false');
+                }
+            });
+
+            container.addEventListener('dragstart', e => {
+                const item = e.target.closest('.block-editor-card');
+                if (!item || item.getAttribute('draggable') !== 'true') {
+                    e.preventDefault();
+                    return;
+                }
+                dragEl = item;
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            container.addEventListener('dragover', e => {
+                e.preventDefault();
+                const item = e.target.closest('.block-editor-card');
+                if (!item || item === dragEl) return;
+                
+                const rect = item.getBoundingClientRect();
+                const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                container.insertBefore(dragEl, next ? item.nextSibling : item);
+            });
+
+            container.addEventListener('dragend', e => {
+                if (dragEl) {
+                    dragEl.classList.remove('dragging');
+                    dragEl.setAttribute('draggable', 'false');
+                }
+                
+                // Reconstruct blocks array order based on DOM children
+                const cards = Array.from(container.querySelectorAll('.block-editor-card'));
+                const newBlocks = [];
+                cards.forEach(card => {
+                    const id = card.getAttribute('data-block-id');
+                    const b = blocks.find(x => x.id === id);
+                    if (b) newBlocks.push(b);
+                });
+                blocks = newBlocks;
+                
+                dragEl = null;
+                updatePreview();
+            });
+        }
+
+        // Controls Panel Clicks Handler
+        controlsPanel.addEventListener('click', e => {
+            const target = e.target;
+            
+            // Expand/Collapse cards
+            const header = target.closest('.block-editor-header');
+            if (header && !target.closest('.remove-block-btn') && !target.closest('.drag-handle')) {
+                toggleBlockExpand(header.getAttribute('data-block-id'));
+                return;
+            }
+
+            // Remove block completely
+            const removeBtn = target.closest('.remove-block-btn');
+            if (removeBtn) {
+                const id = removeBtn.getAttribute('data-block-id');
+                blocks = blocks.filter(b => b.id !== id);
+                expandedBlocks.delete(id);
+                renderBlockEditors();
+                updatePreview();
+                return;
+            }
+
+            // Add dynamic sub-items (social links or buttons)
+            const addSubBtn = target.closest('.sub-add-btn');
+            if (addSubBtn) {
+                const id = addSubBtn.getAttribute('data-block-id');
+                const type = addSubBtn.getAttribute('data-sub-type');
+                const block = blocks.find(b => b.id === id);
+                if (block) {
+                    if (type === 'socials') {
+                        if (!block.socials) block.socials = [];
+                        block.socials.push({ platform: 'website', url: '', iconUrl: '' });
+                    } else if (type === 'buttons') {
+                        if (!block.items) block.items = [];
+                        block.items.push({ text: 'Link text', url: 'https://' });
+                    }
+                    renderBlockEditors();
+                    updatePreview();
+                }
+                return;
+            }
+
+            // Remove dynamic sub-items
+            const removeSubBtn = target.closest('.remove-sub-btn');
+            if (removeSubBtn) {
+                const id = removeSubBtn.getAttribute('data-block-id');
+                const type = removeSubBtn.getAttribute('data-sub-type');
+                const index = parseInt(removeSubBtn.getAttribute('data-index'), 10);
+                const block = blocks.find(b => b.id === id);
+                if (block && !isNaN(index)) {
+                    if (type === 'socials' && block.socials) {
+                        block.socials.splice(index, 1);
+                    } else if (type === 'buttons' && block.items) {
+                        block.items.splice(index, 1);
+                    }
+                    renderBlockEditors();
+                    updatePreview();
+                }
+                return;
+            }
+
+            // Add dynamic main level blocks (Bio, Text, Buttons, Image, etc)
+            const blockAddBtn = target.closest('.block-add-btn');
+            if (blockAddBtn) {
+                const type = blockAddBtn.getAttribute('data-type');
+                const newId = `block-${Date.now()}`;
+                
+                const newBlock = { id: newId, type: type };
+                
+                // Add default properties depending on type
+                if (type === 'bio') {
+                    newBlock.name = 'Jane Doe';
+                    newBlock.avatar = '';
+                    newBlock.bio = 'Write a short bio here.';
+                    newBlock.socials = [];
+                } else if (type === 'text') {
+                    newBlock.title = 'Heading';
+                    newBlock.content = 'Write your text here.';
+                } else if (type === 'buttons') {
+                    newBlock.items = [{ text: 'Button Label', url: 'https://' }];
+                } else if (type === 'image') {
+                    newBlock.imageUrl = '';
+                    newBlock.altText = 'Image description';
+                    newBlock.caption = '';
+                } else if (type === 'video') {
+                    newBlock.videoType = 'embed';
+                    newBlock.videoUrl = '';
+                } else if (type === 'audio') {
+                    newBlock.audioType = 'embed';
+                    newBlock.audioUrl = '';
+                } else if (type === 'form') {
+                    newBlock.formType = 'contact';
+                    newBlock.formAction = '';
+                    newBlock.successMessage = 'Message sent!';
+                } else if (type === 'divider') {
+                    newBlock.dividerType = 'line';
+                    newBlock.spacing = '2';
+                }
+                
+                blocks.push(newBlock);
+                expandedBlocks.clear();
+                expandedBlocks.add(newId);
+                
+                renderBlockEditors();
+                
+                // Scroll card into view
+                setTimeout(() => {
+                    const card = blocksContainer.querySelector(`[data-block-id="${newId}"]`);
+                    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+                
+                updatePreview();
+            }
+        });
+
+        // Register event inputs
+        ['input', 'change'].forEach(evt => controlsPanel.addEventListener(evt, handleControlInput));
+        
+        previewFrame.addEventListener('load', () => setTimeout(updatePreview, 100));
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderBlockEditors();
+            setupDragAndDrop(blocksContainer);
+            
+            const initialPreviewHtml = `<!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <title></title>
+                    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <meta name="referrer" content="strict-origin-when-cross-origin">
+                    <style>${templateStyleCss.replace(/<\/style>/g, '<\\/style>')}</style>
+                </head>
+                <body>
+                    <button id="theme-toggle-button" class="theme-toggle" aria-label="Toggle Dark Mode"></button>
+                    <main id="blocks-container"></main>
+                    <script>${templateScriptJs.replace(/<\/script>/g, '<\\/script>')}<\/script>
+                </body>
+                </html>`;
+            previewFrame.srcdoc = initialPreviewHtml;
+        });
+
+        // Generate Zip File Logic
+        document.getElementById('generate-button').addEventListener('click', async () => {
+            const button = document.getElementById('generate-button');
+            const downloadContainer = document.getElementById('download-container');
+            button.textContent = 'Generating...';
+            button.disabled = true;
+            downloadContainer.innerHTML = '';
+
+            try {
+                // Compile block HTML structures
+                const blocksHTML = blocks.map(block => {
+                    // Escape data values but output structure
+                    if (block.type === 'bio') {
+                        const socialsHtml = (block.socials || []).map(s => {
+                            if (!s.url) return '';
+                            let label = s.platform.charAt(0).toUpperCase() + s.platform.slice(1);
+                            let href = s.url;
+                            if (s.platform === 'email' && !href.startsWith('mailto:')) {
+                                href = 'mailto:' + href;
+                            }
+                            const iconContent = s.iconUrl ? `<img src="${escapeHTML(s.iconUrl)}" alt="${escapeHTML(label)}">` : getSocialIconSvg(s.platform);
+                            return `            <a href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHTML(label)}" title="${escapeHTML(label)}">${iconContent}</a>`;
+                        }).filter(x => x).join('\n');
+
+                        const avatarSrc = block.avatar || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='%23AAAAAA'><rect width='100' height='100' fill='%23E8E7E5'/><circle cx='50' cy='40' r='18'/><path d='M50 63c-22 0-35 12-35 25v4h70v-4c0-13-13-25-35-25z'/></svg>";
+                        return `    <div class="block bio-block">
+        <img class="bio-avatar" src="${escapeHTML(avatarSrc)}" alt="${escapeHTML(block.name)}">
+        <h1 class="bio-name">${escapeHTML(block.name)}</h1>
+        ${block.bio ? `<p class="bio-text">${escapeHTML(block.bio)}</p>` : ''}
+        ${socialsHtml ? `<div class="bio-socials">\n${socialsHtml}\n        </div>` : ''}
+    </div>`;
+                    } else if (block.type === 'text') {
+                        const paragraphs = (block.content || '').split('\n').filter(p => p.trim()).map(p => `        <p>${escapeHTML(p)}</p>`).join('\n');
+                        return `    <div class="block text-block">
+        ${block.title ? `<h2>${escapeHTML(block.title)}</h2>` : ''}
+${paragraphs}
+    </div>`;
+                    } else if (block.type === 'buttons') {
+                        const buttonsHtml = (block.items || []).map(item => {
+                            return `        <a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer" class="action-button">${escapeHTML(item.text)}</a>`;
+                        }).join('\n');
+                        return `    <div class="block buttons-block">
+${buttonsHtml}
+    </div>`;
+                    } else if (block.type === 'image') {
+                        if (!block.imageUrl) return '';
+                        return `    <figure class="block image-block">
+        <img src="${escapeHTML(block.imageUrl)}" alt="${escapeHTML(block.altText || '')}">
+        ${block.caption ? `<figcaption class="image-caption">${escapeHTML(block.caption)}</figcaption>` : ''}
+    </figure>`;
+                    } else if (block.type === 'video') {
+                        if (!block.videoUrl) return '';
+                        if (block.videoType === 'direct') {
+                            return `    <div class="block video-block" data-video-type="direct" data-video-url="${escapeHTML(block.videoUrl)}">
+        <video src="${escapeHTML(block.videoUrl)}" controls style="width:100%; border-radius: 8px;"></video>
+    </div>`;
+                        } else {
+                            return `    <div class="block video-block" data-video-type="embed" data-video-url="${escapeHTML(block.videoUrl)}">
+    </div>`;
+                        }
+                    } else if (block.type === 'audio') {
+                        if (!block.audioUrl) return '';
+                        if (block.audioType === 'direct') {
+                            return `    <div class="block audio-block">
+        <audio src="${escapeHTML(block.audioUrl)}" controls style="width:100%;"></audio>
+    </div>`;
+                        } else {
+                            const embedUrl = getEmbedUrl(block.audioUrl, 'audio');
+                            if (!embedUrl) return '';
+                            const height = embedUrl.includes('spotify') ? '80' : '166';
+                            return `    <div class="block audio-block">
+        <iframe src="${escapeHTML(embedUrl)}" width="100%" height="${height}" scrolling="no" frameborder="no" allow="autoplay; encrypted-media"></iframe>
+    </div>`;
+                        }
+                    } else if (block.type === 'form') {
+                        const action = block.formAction ? `action="${escapeHTML(block.formAction)}"` : 'data-netlify="true" name="contact-form"';
+                        const successRedirect = block.successMessage ? `<input type="hidden" name="_next" value="${escapeHTML(block.successMessage)}">` : '';
+                        
+                        if (block.formType === 'newsletter') {
+                            return `    <div class="block form-block">
+        <h3>Newsletter Signup</h3>
+        <form ${action} method="POST">
+            ${successRedirect}
+            <div class="form-group-field">
+                <label>Email Address</label>
+                <input type="email" name="email" required placeholder="email@example.com">
+            </div>
+            <button type="submit" class="form-submit-btn">Subscribe</button>
+        </form>
+    </div>`;
+                        } else {
+                            return `    <div class="block form-block">
+        <h3>Contact Me</h3>
+        <form ${action} method="POST">
+            ${successRedirect}
+            <div class="form-group-field">
+                <label>Your Name</label>
+                <input type="text" name="name" required placeholder="Your Name">
+            </div>
+            <div class="form-group-field">
+                <label>Email Address</label>
+                <input type="email" name="email" required placeholder="email@example.com">
+            </div>
+            <div class="form-group-field">
+                <label>Your Message</label>
+                <textarea name="message" required placeholder="Write your message here..."></textarea>
+            </div>
+            <button type="submit" class="form-submit-btn">Send Message</button>
+        </form>
+    </div>`;
+                        }
+                    } else if (block.type === 'divider') {
+                        const spaceHeight = block.spacing === '1' ? '1rem' : block.spacing === '3' ? '3rem' : block.spacing === '4' ? '4rem' : '2rem';
+                        if (block.dividerType === 'spacer') {
+                            return `    <div class="block" style="height: ${spaceHeight};"></div>`;
+                        } else {
+                            return `    <div class="block" style="margin-top: calc(${spaceHeight} / 2); margin-bottom: calc(${spaceHeight} / 2);"><hr class="divider-line"></div>`;
+                        }
+                    }
+                    return '';
+                }).join('\n\n');
+
+                const settingsContent = `// Site Settings\nconst colorScheme = ${JSON.stringify(document.getElementById('color-scheme').value)};\nconst fontScheme = ${JSON.stringify(document.getElementById('font-scheme').value)};\n`;
+                
+                const indexHtmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>${escapeHTML(document.getElementById('site-title').value)}</title>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <link rel="stylesheet" href="style.css">
+    <script src="settings.js" defer><\/script>
+    <script src="script.js" defer><\/script>
+</head>
+<body>
+    <button id="theme-toggle-button" class="theme-toggle" aria-label="Toggle Dark Mode"></button>
+    <main id="blocks-container">
+\n${blocksHTML}\n
+    </main>
+</body>
+</html>`;
+                
+                const zip = new JSZip();
+                const zipFolder = zip.folder("upload_these_files");
+                zipFolder.file("index.html", indexHtmlContent);
+                zipFolder.file("settings.js", settingsContent);
+                zipFolder.file("style.css", templateStyleCss);
+                zipFolder.file("script.js", templateScriptJs);
+
+                const zipBlob = await zip.generateAsync({ type: "blob" });
+                const downloadUrl = URL.createObjectURL(zipBlob);
+                
+                downloadContainer.innerHTML = `<h4>Website Ready</h4><a href="${downloadUrl}" download="upload_these_files.zip">Download ZIP</a><p class="info">Extract this ZIP and upload the files inside the \`upload_these_files\` folder to your web host.</p>`;
+            } catch (error) {
+                console.error("Failed to generate zip file:", error);
+                downloadContainer.innerHTML = `<p class="info" style="color: #dc3545;">An error occurred during generation. See console for details.</p>`;
+            } finally {
+                button.textContent = 'Generate Website';
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
