@@ -2,6 +2,8 @@
 
 A lightweight, beautiful, and modular one-page website builder (similar to Carrd) designed following the minimalist design guidelines of Truly Simple Tools. Create portfolios, bio cards, product landing pages, newsletter signups, and media embeds quickly and for free.
 
+**Use it online**: [colinwright.github.io/simple-page-maker](https://colinwright.github.io/simple-page-maker/)
+
 ---
 
 ## Features
@@ -24,11 +26,17 @@ A lightweight, beautiful, and modular one-page website builder (similar to Carrd
 
 ## Setup & Customization
 
-You can run the builder offline:
-1. Double-click the `SimplePageMaker.html` file to open it in your default web browser.
-2. Customize the global page settings (Page Title, Theme, Fonts) in the left sidebar.
-3. Add and configure blocks. Use the drag handles to reorder sections.
-4. Click **Generate Website** to download the `upload_these_files.zip` folder.
+You can use the builder online or run it 100% offline:
+
+### Online
+Simply open the builder in your browser: [colinwright.github.io/simple-page-maker](https://colinwright.github.io/simple-page-maker/)
+
+### Offline / Local
+1. Download this repository.
+2. Double-click the `index.html` file to open it in your default web browser.
+3. Customize the global page settings (Page Title, Theme, Fonts) in the left sidebar.
+4. Add and configure blocks. Use the drag handles to reorder sections.
+5. Click **Generate Website** to download the `upload_these_files.zip` folder.
 
 ---
 
